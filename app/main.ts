@@ -2,8 +2,10 @@ import * as net from "net";
 import fs from "fs";
 
 type Options = {
+  method: string;
   path: string;
   headers: { [key: string]: string };
+  body: string;
 };
 
 const echo = ({ path }: Options) => {
@@ -35,26 +37,36 @@ const files = (options: Options) => {
   let filename = options.path.replace("/files/", "");
   const filepath = `${directory}${filename}`;
 
-  if (!fs.existsSync(filepath)) return notFound(options);
+  if (options.method === "GET") {
+    if (!fs.existsSync(filepath)) return notFound(options);
 
-  const content = fs.readFileSync(filepath).toString("utf8");
+    const content = fs.readFileSync(filepath).toString("utf8");
 
-  return `HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${content.length}\r\n\r\n${content}`;
+    return `HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${content.length}\r\n\r\n${content}`;
+  } else if (options.method === "POST") {
+    fs.writeFileSync(filepath, options.body);
+
+    return `HTTP/1.1 201 Created\r\n\r\n`;
+  } else {
+    return `HTTP/1.1 405 Method Not Allowed\r\n\r\n`;
+  }
 };
 
 const server = net.createServer((socket) => {
   socket.on("data", (data) => {
     const request = data.toString();
     const parts = request.split("\r\n");
-    const [_method, path, _version] = parts[0].split(" ");
+    const [method, path, _version] = parts[0].split(" ");
     const headers: { [key: string]: string } = {};
     for (let i = 1; i < parts.length - 2; i++) {
       const [key, value] = parts[i].split(": ");
       headers[key] = value;
     }
     const options = {
+      method,
       path,
       headers,
+      body: parts[parts.length - 1],
     };
 
     if (path === "/") {
