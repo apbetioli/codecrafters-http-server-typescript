@@ -8,9 +8,15 @@ type Options = {
   body: string;
 };
 
-const echo = ({ path }: Options) => {
-  let str = path.replace("/echo/", "");
-  return `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${str.length}\r\n\r\n${str}`;
+const echo = ({ path, headers }: Options) => {
+  const str = path.replace("/echo/", "");
+
+  let responseHeaders = `Content-Type: text/plain\r\nContent-Length: ${str.length}\r\n`;
+  if (headers["accept-encoding"] === "gzip") {
+    responseHeaders += `Content-Encoding: ${headers["accept-encoding"]}\r\n`;
+  }
+
+  return `HTTP/1.1 200 OK\r\n${responseHeaders}\r\n${str}`;
 };
 
 const root = (options: Options) => {
@@ -22,8 +28,8 @@ const notFound = (options: Options) => {
 };
 
 const userAgent = ({ headers }: Options) => {
-  const useragent = headers["User-Agent"];
-  return `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${useragent.length}\r\n\r\n${useragent}`;
+  const ua = headers["user-agent"];
+  return `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${ua.length}\r\n\r\n${ua}`;
 };
 
 const files = (options: Options) => {
@@ -60,7 +66,7 @@ const server = net.createServer((socket) => {
     const headers: { [key: string]: string } = {};
     for (let i = 1; i < parts.length - 2; i++) {
       const [key, value] = parts[i].split(": ");
-      headers[key] = value;
+      headers[key.toLowerCase()] = value;
     }
     const options = {
       method,
