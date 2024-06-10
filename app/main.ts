@@ -12,8 +12,14 @@ const echo = ({ path, headers }: Options) => {
   const str = path.replace("/echo/", "");
 
   let responseHeaders = `Content-Type: text/plain\r\nContent-Length: ${str.length}\r\n`;
-  if (headers["accept-encoding"] === "gzip") {
-    responseHeaders += `Content-Encoding: ${headers["accept-encoding"]}\r\n`;
+  if (
+    headers &&
+    headers["accept-encoding"] &&
+    headers["accept-encoding"]
+      .split(",")
+      .find((encoding) => encoding.trim() === "gzip")
+  ) {
+    responseHeaders += `Content-Encoding: gzip\r\n`;
   }
 
   return `HTTP/1.1 200 OK\r\n${responseHeaders}\r\n${str}`;
