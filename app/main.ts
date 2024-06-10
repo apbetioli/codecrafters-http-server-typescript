@@ -1,24 +1,45 @@
 import * as net from "net";
+import fs from "fs";
 
-const echo = (path: string) => {
-  let str = path.replace("/echo", "");
-  if (str.startsWith("/")) {
-    str = str.replace("/", "");
-  }
+type Options = {
+  path: string;
+  headers: { [key: string]: string };
+};
+
+const echo = ({ path }: Options) => {
+  let str = path.replace("/echo/", "");
   return `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${str.length}\r\n\r\n${str}`;
 };
 
-const root = () => {
+const root = (options: Options) => {
   return "HTTP/1.1 200 OK\r\n\r\n";
 };
 
-const notFound = () => {
+const notFound = (options: Options) => {
   return "HTTP/1.1 404 Not Found\r\n\r\n";
 };
 
-const userAgent = (headers: { [key: string]: string }) => {
+const userAgent = ({ headers }: Options) => {
   const useragent = headers["User-Agent"];
   return `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${useragent.length}\r\n\r\n${useragent}`;
+};
+
+const files = (options: Options) => {
+  let directory = "/tmp/";
+  const directoryIndex = process.argv.findIndex((arg) => arg === "--directory");
+  if (directoryIndex >= 0) {
+    directory = process.argv[directoryIndex + 1];
+    if (!directory.endsWith("/")) directory += "/";
+  }
+
+  let filename = options.path.replace("/files/", "");
+  const filepath = `${directory}${filename}`;
+
+  if (!fs.existsSync(filepath)) return notFound(options);
+
+  const content = fs.readFileSync(filepath).toString("utf8");
+
+  return `HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: ${content.length}\r\n\r\n${content}`;
 };
 
 const server = net.createServer((socket) => {
@@ -31,15 +52,21 @@ const server = net.createServer((socket) => {
       const [key, value] = parts[i].split(": ");
       headers[key] = value;
     }
+    const options = {
+      path,
+      headers,
+    };
 
     if (path === "/") {
-      var response = root();
-    } else if (path.startsWith("/echo")) {
-      var response = echo(path);
+      var response = root(options);
+    } else if (path.startsWith("/echo/")) {
+      var response = echo(options);
+    } else if (path.startsWith("/files/")) {
+      var response = files(options);
     } else if (path === "/user-agent") {
-      var response = userAgent(headers);
+      var response = userAgent(options);
     } else {
-      var response = notFound();
+      var response = notFound(options);
     }
 
     socket.write(response);
